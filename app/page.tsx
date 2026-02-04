@@ -1,51 +1,91 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Form, InputGroup, Button } from 'react-bootstrap';
+import { useState } from 'react';
+import { Button, Card } from 'react-bootstrap';
+import { ethers } from 'ethers';
 
 export default function Home() {
-  const [walletNumber, setWalletNumber] = useState('');
+  const [account, setAccount] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  const handleSubmit = (e: React.SubmitEvent) => {
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    if (!walletNumber.trim()) {
+    setError(null);
+
+    if (!window.ethereum?.isMetaMask) {
+      setError('Please install the MetaMask extension.');
       return;
     }
-    //TODO: wallet connection
+
+    try {
+      setIsConnecting(true);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.send('eth_requestAccounts', []);
+      const acc = accounts[0];
+      setAccount(acc);
+
+      const rawBalance = await provider.getBalance(acc);
+      const eth = Number(ethers.formatEther(rawBalance)).toFixed(4);
+      setBalance(eth);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to connect wallet. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setIsConnecting(false);
+    }
   };
-  const handleClear = () => setWalletNumber('');
+
+  const handleDisconnect = () => {
+    setAccount(null);
+    setBalance(null);
+    setError(null);
+  };
+
   return (
     <div className='container m-3'>
-      <div className='row'>
-        <Form onSubmit={handleSubmit} className='mb-4'>
-          <InputGroup className='mb-3'>
-            <Form.Control
-              placeholder='Enter wallet number'
-              aria-label='wallet number'
-              aria-describedby='connectWallet'
-              name='walletNumber'
-              id='walletNumberField'
-              type='text'
-              autoComplete='off'
-              value={walletNumber}
-              onChange={(e) => setWalletNumber(e.target.value)}
-            />
-            {walletNumber && (
-              <Button
-                variant='outline-secondary-light'
-                onClick={handleClear}
-                type='button'
-                className='border-0'
-              >
-                ✕
-              </Button>
-            )}
-            <Button variant='primary' id='connectWallet'>
-              Connect Wallet
-            </Button>
-          </InputGroup>
-        </Form>
+      <div className='row mb-3'>
+        {!account ? (
+          <Button
+            variant='primary'
+            id='connectWallet'
+            type='button'
+            onClick={handleClick}
+            disabled={isConnecting}
+          >
+            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          </Button>
+        ) : null}
       </div>
+      {account && (
+        <div className='row mb-3'>
+          <Card>
+            <Card.Body>
+              <Card.Title>
+                Wallet: <br />
+                {account}
+              </Card.Title>
+              <Card.Text>Balance: {balance} ETH</Card.Text>
+              <Button
+                variant='info'
+                id='disconnectWallet'
+                type='button'
+                onClick={handleDisconnect}
+              >
+                Disconnect Wallet
+              </Button>
+            </Card.Body>
+          </Card>
+        </div>
+      )}
+      {error && (
+        <div className='alert alert-danger'>
+          <strong>Error!</strong>
+          <br />
+          {error}
+        </div>
+      )}
     </div>
   );
 }
