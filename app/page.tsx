@@ -6,8 +6,15 @@ import { ethers } from 'ethers';
 
 interface AccountInfo {
   address: string;
-  balance: string;
+  ethBalance: string;
+  usdtBalance: string;
 }
+
+const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+const USDT_ABI = [
+  'function balanceOf(address owner) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+];
 
 export default function Home() {
   const [accountsInfo, setAccountsInfo] = useState<AccountInfo[]>([]);
@@ -31,8 +38,19 @@ export default function Home() {
       const accountsWithBalances: AccountInfo[] = await Promise.all(
         accounts.map(async (address: string) => {
           const rawBalance = await provider.getBalance(address);
-          const balance = Number(ethers.formatEther(rawBalance)).toFixed(4);
-          return { address, balance };
+          const ethBalance = Number(ethers.formatEther(rawBalance)).toFixed(4);
+
+          const usdtContract = new ethers.Contract(
+            USDT_ADDRESS,
+            USDT_ABI,
+            provider,
+          );
+
+          const rawUsdtBalance = await usdtContract.balanceOf(address);
+          const usdtBalance = Number(
+            ethers.formatUnits(rawUsdtBalance, 6),
+          ).toFixed(2);
+          return { address, ethBalance, usdtBalance };
         }),
       );
       setAccountsInfo(accountsWithBalances);
@@ -54,7 +72,7 @@ export default function Home() {
 
   return (
     <div className='container m-3'>
-      <div className='row mb-3 justify-content-md-center'>
+      <div className='row mb-3 justify-content-center'>
         {accountsInfo.length === 0 ? (
           <Button
             className='col-md-6'
@@ -79,15 +97,26 @@ export default function Home() {
         )}
       </div>
       {accountsInfo.length > 0 && (
-        <div className='row mb-3 justify-content-md-center'>
+        <div className='row mb-3 justify-content-center'>
           {accountsInfo.map((account, idx) => (
             <Card key={account.address} className='col-md-6 m-1'>
               <Card.Body>
-                <Card.Title>
-                  Account {idx + 1}: <br />
+                <Card.Header className='bg-transparent'>
+                  <strong>Account {idx + 1}:</strong>
+                  <br />
                   {account.address}
-                </Card.Title>
-                <Card.Text>Balance: {account.balance} ETH</Card.Text>
+                </Card.Header>
+                <div className='d-flex align-items-center gap-3 p-3'>
+                  <Card.Text className='m-0 fw-bold'>Balance:</Card.Text>
+                  <div className='d-flex flex-column gap-1'>
+                    <Card.Text className='m-0'>
+                      {account.ethBalance} ETH
+                    </Card.Text>
+                    <Card.Text className='m-0'>
+                      {account.usdtBalance} USDT
+                    </Card.Text>
+                  </div>
+                </div>
               </Card.Body>
             </Card>
           ))}
